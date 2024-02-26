@@ -37,11 +37,11 @@ local MAXFILESIZE = 16 * 1024
 
 local endianness
 local insecure
+local verbose
+
 local do_merge
 local do_report
 local do_rescan
-
-local COMPAT_DIRS
 
 -- print abort or usage message
 local function abort(msg)
@@ -60,44 +60,13 @@ local function usage(erropt)
    os.exit(1)
 end
 
--- return a table of compat library backup directories
-local function get_compat_dirs()
-   local compat_dirs = { -- should use sysctl("user.compatlibs_path")
-      "/usr/local/lib/compat/pkg",
-      --"usr/local/lib32/compat",
-   }
-   local compatdir_table = {}
-   for i = 1, #compat_dirs do
-      compatdir_table[compat_dirs[i]] = i
-   end
-   return compatdir_table
-end
-
--- return position of a directory in the compat directory table
-local function compat_path_idx(dir, trusted)
-   if not COMPAT_DIRS then
-      if not trusted then
-	 COMPAT_DIRS = get_compat_dirs()
-      else
-	 COMPAT_DIRS = {}
-      end
-   end
-   return COMPAT_DIRS[dir] or -1
-end
-
 -- return position where to insert new search path entry
 local function insert_at(dirs, name, trusted)
    local pos = #dirs + 1
-   local compat_idx = compat_path_idx(name, trusted)
    for i = 1, #dirs do
       if name == dirs[i] then
 	 return
       end
-   --[[
-      if compat_idx < compat_path_idx(dirs[i], trusted) then
-	 pos = pos - 1
-      end
-   --]]
    end
    return pos
 end
@@ -202,7 +171,8 @@ local function readhints(filename, must_exist)
       return add_hints_dirs(data)
    elseif must_exist then
       return nil, filename .. " not found"
-   else
+    else
+    endianness = "<"
       return {}
    end
 end
@@ -222,6 +192,7 @@ end
 -- fetch list of library directories from hints file
 local function read_elf_hints(hintsfile, must_exist)
    local valid, errmsg = validate_hintsfile(hintsfile)
+   local dirs
    if valid then
       dirs, errmsg = readhints(hintsfile, must_exist)
    end
@@ -392,6 +363,7 @@ do_rescan = opt.R or #opt == 0
 
 endianness = opt.B and ">" or nil
 insecure = opt.i
+verbose = opt.v -- unused
 
 local hintsfile = opt.f or opt["32"] and PATH_ELF32_HINTS or PATH_ELF_HINTS
 
@@ -400,5 +372,3 @@ if do_report then
 elseif do_rescan or do_merge then
    update_elf_hints(hintsfile, opt)
 end
-
-os.exit(0)
